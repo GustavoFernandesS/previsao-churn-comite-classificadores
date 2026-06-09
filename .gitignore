@@ -1,0 +1,10 @@
+data/*.csv
+.ipynb_checkpoints/
+__pycache__/
+.venv/
+reports/assets/
+reports/rendered/
+reports/final_rendered/
+reports/roteiro_rendered/
+reports/~$*
+*.pyc
