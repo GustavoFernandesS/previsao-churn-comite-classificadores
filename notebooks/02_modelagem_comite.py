@@ -12,6 +12,13 @@
 # probabilidade prevista por cada modelo e considerada, e a classe com maior
 # probabilidade media e escolhida.
 
+# %% [markdown]
+# ## Tecnica: importacao e configuracao das bibliotecas
+#
+# Este bloco importa os classificadores, as metricas, as ferramentas de
+# pre-processamento e os recursos de visualizacao. O `RANDOM_STATE` torna
+# reproduziveis a divisao dos dados e os algoritmos que possuem aleatoriedade.
+
 # %%
 from pathlib import Path
 
@@ -48,6 +55,10 @@ RANDOM_STATE = 42
 # Repetimos a preparacao no notebook para que ele possa ser executado de forma
 # independente. O mesmo `random_state` garante a mesma divisao da etapa
 # anterior.
+#
+# **Tecnicas utilizadas:** limpeza de dados, definicao de features/target e
+# divisao estratificada. A divisao estratificada preserva a proporcao de churn,
+# permitindo uma comparacao justa entre os modelos.
 
 # %%
 possiveis_caminhos = [
@@ -73,6 +84,14 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 print("Treino:", X_train.shape, "| Teste:", X_test.shape)
+
+# %% [markdown]
+# **Tecnica utilizada:** pipeline de pre-processamento.
+#
+# As variaveis numericas recebem imputacao pela mediana e padronizacao. As
+# categoricas recebem imputacao pela moda e one-hot encoding. O resultado
+# denso (`sparse_output=False`) e necessario para compatibilidade com o
+# `GaussianNB`.
 
 # %%
 colunas_numericas = X.select_dtypes(include=np.number).columns.tolist()
@@ -108,6 +127,18 @@ preprocessador = ColumnTransformer(
 # - A Arvore tem profundidade limitada para reduzir overfitting.
 #
 # Todos os modelos sao combinados ao mesmo preprocessador usando `Pipeline`.
+#
+# **Como cada tecnica funciona:**
+#
+# - **KNN:** classifica pelo voto dos clientes mais proximos. Depende de
+#   padronizacao porque calcula distancias;
+# - **Naive Bayes:** estima probabilidades assumindo independencia entre as
+#   features. E simples, rapido e costuma apresentar recall elevado;
+# - **SVM:** procura uma fronteira que separe as classes. O kernel RBF permite
+#   fronteiras nao lineares, e a calibracao gera probabilidades para o comite;
+# - **Arvore de Decisao:** cria regras sucessivas e interpretaveis. Limitar a
+#   profundidade reduz o risco de memorizar os dados de treino;
+# - **clone:** cria copias independentes do preprocessador para cada modelo.
 
 # %%
 classificadores = {
@@ -147,6 +178,12 @@ list(modelos)
 # - **Precisao:** entre os clientes previstos como churn, quantos cancelaram.
 # - **Recall:** entre os clientes que cancelaram, quantos foram identificados.
 # - **F1-score:** equilibrio entre precisao e recall.
+#
+# **Tecnica utilizada:** aprendizado supervisionado.
+#
+# Cada modelo aprende usando pares de features e respostas conhecidas no
+# conjunto de treino. Depois, realiza previsoes para clientes do conjunto de
+# teste. A funcao `calcular_metricas` padroniza a avaliacao de todos os modelos.
 
 # %%
 def calcular_metricas(y_verdadeiro, y_previsto):
@@ -184,6 +221,12 @@ print(resultados_df.round(4))
 # - superior direito: falsos alertas de churn;
 # - inferior esquerdo: churns nao identificados;
 # - inferior direito: churns identificados corretamente.
+#
+# **Tecnica utilizada:** matriz de confusao.
+#
+# Ela detalha os tipos de acerto e erro. Para retencao de clientes, o quadrante
+# inferior esquerdo merece atencao, pois representa clientes que cancelaram,
+# mas foram classificados como se fossem permanecer.
 
 # %%
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
@@ -212,6 +255,12 @@ plt.show()
 # Cada classificador informa a probabilidade de churn, e o comite calcula a
 # media dessas probabilidades. Essa estrategia aproveita diferentes formas de
 # aprendizado e considera o grau de confianca de cada modelo.
+#
+# **Tecnica utilizada:** ensemble por votacao suave.
+#
+# Um ensemble combina modelos com comportamentos diferentes para tentar obter
+# uma decisao mais equilibrada. Diferentemente da votacao majoritaria, a
+# votacao suave considera a confianca expressa pelas probabilidades.
 
 # %%
 comite = VotingClassifier(
@@ -234,6 +283,11 @@ resultados_df.loc["Comite"] = metricas_comite
 resultados_df = resultados_df.sort_values("F1-score", ascending=False)
 print(resultados_df.round(4))
 
+# %% [markdown]
+# A matriz abaixo aplica a mesma tecnica de matriz de confusao ao comite. Ela
+# permite verificar se a combinacao reduziu churns nao identificados sem gerar
+# uma quantidade excessiva de falsos alertas.
+
 # %%
 matriz_comite = confusion_matrix(y_test, y_pred_comite)
 sns.heatmap(
@@ -255,6 +309,12 @@ plt.show()
 #
 # Como o target e desbalanceado, o F1-score e usado como criterio principal
 # para comparar o equilibrio entre identificar churns e evitar falsos alertas.
+#
+# **Tecnica utilizada:** comparacao visual de metricas.
+#
+# O formato longo criado por `melt` permite colocar as quatro metricas lado a
+# lado para cada modelo, facilitando a identificacao de seus pontos fortes e
+# fracos.
 
 # %%
 resultados_long = (
@@ -270,6 +330,13 @@ plt.xticks(rotation=15)
 plt.legend(loc="lower right")
 plt.tight_layout()
 plt.show()
+
+# %% [markdown]
+# **Tecnica utilizada:** selecao do melhor modelo por metrica.
+#
+# O melhor modelo individual e selecionado pelo maior F1-score e comparado ao
+# comite. Essa regra responde objetivamente se o ensemble melhorou o equilibrio
+# entre precisao e recall.
 
 # %%
 melhor_individual = resultados_df.drop(index="Comite")["F1-score"].idxmax()

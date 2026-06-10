@@ -8,6 +8,18 @@
 # Nesta etapa, vamos conhecer a base, corrigir problemas nos dados e preparar
 # conjuntos de treino e teste. A modelagem sera feita na proxima etapa.
 
+# %% [markdown]
+# ## Tecnica: importacao e configuracao das bibliotecas
+#
+# Este bloco importa as ferramentas utilizadas no projeto:
+#
+# - `pandas` e `numpy`: manipulacao e analise de dados;
+# - `matplotlib` e `seaborn`: criacao de graficos para a EDA;
+# - componentes do `scikit-learn`: separacao dos dados e pre-processamento.
+#
+# O `RANDOM_STATE` fixa a aleatoriedade para que a divisao dos dados possa ser
+# reproduzida em outras execucoes.
+
 # %%
 from pathlib import Path
 
@@ -29,6 +41,11 @@ RANDOM_STATE = 42
 #
 # O caminho abaixo funciona ao executar o notebook tanto na raiz do projeto
 # quanto dentro da pasta `notebooks`.
+#
+# **Tecnica utilizada:** leitura de dados tabulares com `pandas`.
+#
+# O CSV e carregado em um DataFrame, estrutura que permite filtrar, transformar
+# e analisar as linhas e colunas da base.
 
 # %%
 possiveis_caminhos = [
@@ -47,6 +64,11 @@ df.head()
 # %% [markdown]
 # Cada linha representa um cliente. As features descrevem perfil, servicos
 # contratados, forma de pagamento e valores cobrados.
+#
+# **Tecnica utilizada:** inspecao estrutural dos dados.
+#
+# `info()` mostra tipos e valores preenchidos. `describe()` gera estatisticas
+# descritivas, ajudando a identificar escalas, categorias e possiveis problemas.
 
 # %%
 df.info()
@@ -59,6 +81,12 @@ df.describe(include="all").T
 #
 # `TotalCharges` deveria ser numerica, mas foi carregada como texto porque
 # possui espacos vazios. Esses espacos serao convertidos em valores ausentes.
+#
+# **Tecnica utilizada:** limpeza e conversao de tipos.
+#
+# Tambem verificamos duplicatas e valores ausentes. O parametro
+# `errors="coerce"` transforma valores invalidos em `NaN`, permitindo que eles
+# sejam tratados corretamente no pipeline.
 
 # %%
 print("Linhas duplicadas:", df.duplicated().sum())
@@ -80,12 +108,25 @@ df.isna().sum()[df.isna().sum() > 0]
 #
 # A base possui mais clientes que permaneceram do que clientes que cancelaram.
 # Portanto, alem da acuracia, sera importante avaliar recall e F1-score.
+#
+# **Tecnica utilizada:** analise de distribuicao da variavel alvo.
+#
+# A contagem absoluta mostra quantos clientes existem em cada classe, enquanto
+# a proporcao revela o desbalanceamento. Isso orienta a escolha das metricas de
+# avaliacao usadas posteriormente.
 
 # %%
 contagem_churn = df["Churn"].value_counts()
 percentual_churn = df["Churn"].value_counts(normalize=True).mul(100).round(2)
 
 pd.DataFrame({"Quantidade": contagem_churn, "Percentual": percentual_churn})
+
+# %% [markdown]
+# **Tecnica utilizada:** grafico de contagem.
+#
+# O grafico facilita a comparacao visual entre as classes `Yes` e `No`. Ele
+# evidencia que prever sempre a classe majoritaria poderia gerar uma acuracia
+# aparentemente boa, mas sem identificar adequadamente os churns.
 
 # %%
 ax = sns.countplot(data=df, x="Churn", hue="Churn", palette="Set2", legend=False)
@@ -97,6 +138,11 @@ plt.show()
 #
 # Os graficos abaixo ajudam a identificar perfis com maior proporcao de
 # cancelamento. A altura representa a taxa media de churn em cada categoria.
+#
+# **Tecnica utilizada:** analise bivariada com graficos de barras.
+#
+# O target e temporariamente convertido para 0 e 1. Assim, a media de
+# `ChurnNumerico` em cada categoria representa diretamente a taxa de churn.
 
 # %%
 df_eda = df.copy()
@@ -115,6 +161,13 @@ axes[0].set(title="Taxa de churn por contrato", ylabel="Taxa de churn", xlabel="
 axes[1].set(title="Taxa de churn por internet", ylabel="Taxa de churn", xlabel="")
 plt.tight_layout()
 plt.show()
+
+# %% [markdown]
+# **Tecnica utilizada:** boxplot para comparar distribuicoes numericas.
+#
+# O boxplot resume mediana, dispersao e valores extremos. Ele permite comparar
+# o tempo como cliente (`tenure`) e a cobranca mensal entre clientes que
+# cancelaram e clientes que permaneceram.
 
 # %%
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
@@ -142,6 +195,12 @@ plt.show()
 #
 # `customerID` e apenas um identificador e nao ajuda a explicar o churn.
 # O target e transformado em 0 e 1 para uso pelos classificadores.
+#
+# **Tecnica utilizada:** divisao estratificada entre treino e teste.
+#
+# Os dados de treino ensinam os modelos, enquanto os dados de teste simulam
+# clientes ainda nao vistos. `stratify=y` preserva a proporcao de churn nos
+# dois conjuntos, e `random_state` torna a divisao reproduzivel.
 
 # %%
 X = df.drop(columns=["customerID", "Churn"])
@@ -174,6 +233,17 @@ print(y_test.value_counts(normalize=True).round(3))
 #   one-hot.
 #
 # O pipeline sera ajustado apenas durante o treinamento de cada modelo.
+#
+# **Tecnicas utilizadas:**
+#
+# - **Imputacao pela mediana:** preenche valores numericos ausentes e sofre
+#   menos influencia de valores extremos;
+# - **Padronizacao:** transforma variaveis numericas para escalas comparaveis,
+#   importante principalmente para KNN e SVM;
+# - **One-hot encoding:** converte categorias em colunas binarias sem criar uma
+#   ordem artificial entre elas;
+# - **ColumnTransformer:** aplica tecnicas diferentes conforme o tipo da coluna;
+# - **Pipeline:** organiza as etapas e ajuda a evitar vazamento de dados.
 
 # %%
 colunas_numericas = X.select_dtypes(include=np.number).columns.tolist()
@@ -209,6 +279,10 @@ print("Quantidade de colunas categoricas:", len(colunas_categoricas))
 # Esta transformacao e feita somente para verificar o resultado. Na etapa de
 # modelagem, o `preprocessador` sera combinado com cada classificador em um
 # unico pipeline.
+#
+# `fit_transform` aprende os parametros usando apenas o treino e transforma os
+# dados. No teste usamos somente `transform`, evitando que informacoes do teste
+# influenciem o aprendizado.
 
 # %%
 X_train_transformado = preprocessador.fit_transform(X_train)
