@@ -125,9 +125,7 @@ preprocessador = ColumnTransformer(
 # - Naive Bayes usa a distribuicao gaussiana.
 # - SVM usa kernel RBF e calibracao para gerar probabilidades para o comite.
 # - A Arvore tem profundidade limitada para reduzir overfitting.
-#
 # Todos os modelos sao combinados ao mesmo preprocessador usando `Pipeline`.
-#
 # **Como cada tecnica funciona:**
 #
 # - **KNN:** classifica pelo voto dos clientes mais proximos. Depende de
@@ -351,6 +349,60 @@ if f1_comite > melhor_f1_individual:
     print("O comite apresentou melhora sobre o melhor modelo individual.")
 else:
     print("O comite nao superou o melhor modelo individual pelo F1-score.")
+
+# %% [markdown]
+# ## 7. Predicao de um cliente individual
+#
+# Ate aqui, o `predict` foi aplicado no conjunto inteiro de teste, com 1.409
+# clientes. Para demonstrar um caso individual, selecionamos apenas um cliente
+# usando `iloc[[0]]`.
+#
+# **Tecnica utilizada:** inferencia para uma unica amostra.
+#
+# O modelo ja foi treinado. Agora ele recebe os dados de um cliente especifico
+# e retorna uma previsao:
+#
+# - `0`: o cliente provavelmente nao cancela;
+# - `1`: o cliente provavelmente cancela.
+#
+# Tambem usamos `predict_proba` para mostrar a probabilidade estimada de cada
+# classe. Isso deixa a decisao mais facil de interpretar.
+
+# %%
+indice_cliente = 0
+
+cliente_individual = X_test.iloc[[indice_cliente]]
+valor_real = y_test.iloc[indice_cliente]
+
+previsao_cliente = comite.predict(cliente_individual)[0]
+probabilidades_cliente = comite.predict_proba(cliente_individual)[0]
+
+rotulos = {0: "Nao cancela", 1: "Cancela"}
+
+print("Dados principais do cliente analisado:")
+display(
+    cliente_individual[
+        [
+            "tenure",
+            "Contract",
+            "PaymentMethod",
+            "MonthlyCharges",
+            "TotalCharges",
+            "InternetService",
+        ]
+    ]
+)
+
+print(f"Valor real: {rotulos[valor_real]}")
+print(f"Previsao do comite: {rotulos[previsao_cliente]}")
+print(f"Probabilidade de nao cancelar: {probabilidades_cliente[0]:.2%}")
+print(f"Probabilidade de cancelar: {probabilidades_cliente[1]:.2%}")
+
+# %% [markdown]
+# Nesse exemplo, mostramos a aplicacao pratica do modelo para um unico cliente.
+# Em um sistema real, a empresa poderia usar essa previsao para decidir se deve
+# fazer uma acao de retencao, como oferecer desconto, suporte ou contato
+# preventivo.
 
 # %% [markdown]
 # ## Conclusao da etapa
